@@ -34,7 +34,7 @@
             >
           </select>
         </div>
-        <button class="submit" type="submit">
+        <button class="submit" type="submit" :disabled="numValue < 1">
           Donate
         </button>
       </form>
@@ -347,6 +347,12 @@ export default class App extends Vue {
         &:hover {
           background: #2e71d5;
           cursor: pointer;
+        }
+
+        &:disabled {
+          background-image: linear-gradient(to bottom, #fff 0, #f9f9f9 100%);
+          background-repeat: repeat-x;
+          cursor: initial;
         }
       }
     }
