@@ -1,4 +1,3 @@
-// импортируем библиотеки
 const Koa = require("koa");
 const mongoose = require("mongoose");
 const koaBody = require("koa-body");
@@ -6,18 +5,18 @@ const serve = require("koa-static");
 const mount = require("koa-mount");
 const router = require("koa-router")();
 
-// подключаем переменные окружения
+// Подключаем переменные окружения
 require("dotenv").config();
 
-// создаем экземпляр Коа
+// Создаем экземпляр Коа
 const app = new Koa();
 
-// добавляем валидацию к серверу
+// Добавляем валидацию к серверу
 require("koa-validate")(app);
 
-// добавляем путь с мидлварью парсера тела запроса
+// Добавляем путь с мидлварью парсера тела запроса
 router.post("/donate", koaBody(), async (ctx) => {
-  // валидация параметров
+  // Валидация параметров
   ctx
     .checkBody("currency")
     .isAlpha("Currency must be provided")
@@ -40,10 +39,10 @@ router.post("/donate", koaBody(), async (ctx) => {
   ctx.body = { ok: isSucces };
 });
 
-// подключаем мидлварь роутера к серверу
+// Подключаем мидлварь роутера к серверу
 app.use(router.routes()).use(router.allowedMethods());
 
-// подключаем статику
+// Подключаем статику
 app.use(mount("/", serve("./dist")));
 app.use(mount("/css", serve("./dist/css")));
 app.use(mount("/js", serve("./dist/js")));

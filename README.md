@@ -1,24 +1,19 @@
-# front
+# To start app:
 
-## Project setup
-```
-npm install
-```
+# 1) Install packages
 
-### Compiles and hot-reloads for development
 ```
-npm run serve
+npm i
 ```
 
-### Compiles and minifies for production
+# 2) Copy .env file and update if necessary
+
 ```
-npm run build
+cp ./.env.example ./.env
 ```
 
-### Lints and fixes files
-```
-npm run lint
-```
+# 3) Run app
 
-### Customize configuration
-See [Configuration Reference](https://cli.vuejs.org/config/).
+```
+npm run start
+```
