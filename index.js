@@ -25,7 +25,7 @@ router.post("/donate", koaBody(), async (ctx) => {
 
   ctx
     .checkBody("amount")
-    .isNumeric("Amount must be provided")
+    .isInt("Amount must be provided")
     .gt(0, "Incorrect value");
 
   if (ctx.errors) {

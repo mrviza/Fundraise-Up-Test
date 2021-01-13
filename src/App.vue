@@ -3,14 +3,14 @@
     <div class="fund-form">
       <div class="presets">
         <button
-          class="preset__button"
+          class="presets__button"
           v-for="(preset, id) in presets"
-          :class="{ '--active': preset === value }"
+          :class="{ '--active': calcPresetValue(id) === value }"
           :key="id"
           @click="setValue(preset)"
         >
           {{ selectedCurrency.symbol }}
-          {{ calcPresetValue(id) | divideByThree }}
+          {{ calcPresetValue(id) }}
         </button>
       </div>
       <form @submit="submitForm">
@@ -34,7 +34,7 @@
             >
           </select>
         </div>
-        <button type="submit">
+        <button class="submit" type="submit">
           Donate
         </button>
       </form>
@@ -42,117 +42,209 @@
   </div>
 </template>
 <script lang="ts">
-export default {
-  name: "App",
-  filters: {
-    divideByThree(value: string | number): string {
-      let stringValue = value;
+import Vue from "vue";
+import Component from "vue-class-component";
+// eslint-disable-next-line
+import { ToastApi } from "vue-toast-notification/types/toast";
+import axios from "axios";
 
-      if (typeof stringValue !== "string") {
-        stringValue = value.toString();
-      }
+interface Currency {
+  name: string;
+  code: string;
+  symbol: string;
+  rate: number;
+}
 
-      const clearValue = stringValue.split(",").join("");
-      const len = clearValue.length;
+declare module "vue/types/vue" {
+  interface VueConstructor {
+    $toast: ToastApi;
+  }
 
-      let newValueArr = [];
-      for (let i = len - 1; i >= 0; i--) {
-        if (i !== len - 1 && (len - i - 1) % 3 === 0) {
-          newValueArr.push(",");
-        }
+  interface Vue {
+    $toast: ToastApi;
+  }
+}
 
-        const alpha = clearValue[i];
-        newValueArr.push(alpha);
-      }
+@Component
+export default class App extends Vue {
+  private suggestion = 40;
 
-      const newValue = newValueArr.reverse().join("");
-      return newValue;
-    },
-  },
-  data() {
-    return {
-      currencies: [
-        { name: "US Dollar", code: "USD", symbol: "$", rate: 1 },
-        { name: "Euro", code: "EUR", symbol: "€", rate: 0.897597 },
-        { name: "British Pound", code: "GBP", symbol: "£", rate: 0.81755 },
-        { name: "Russian Ruble", code: "RUB", symbol: "₽", rate: 63.461993 },
-      ],
-      presets: [40, 100, 200, 1000, 2500, 5000],
-      suggestion: 40,
-      dollarValue: 40,
-      value: 40,
-      selectedCurrency: undefined,
-    };
-  },
+  public currencies: Currency[] = [
+    { name: "US Dollar", code: "USD", symbol: "$", rate: 1 },
+    { name: "Euro", code: "EUR", symbol: "€", rate: 0.897597 },
+    { name: "British Pound", code: "GBP", symbol: "£", rate: 0.81755 },
+    { name: "Russian Ruble", code: "RUB", symbol: "₽", rate: 63.461993 },
+  ];
+  public presets = [40, 100, 200, 1000, 2500, 5000];
+  public value = "";
+  public selectedCurrency: null | Currency = null;
+  public dollarValue = 40;
+
+  /**
+   * Калькулируемое свойства, возвращающее сумму ввиде числа
+   */
+  get numValue() {
+    const clearValue = this.value.split(",").join("");
+    const numValue = parseInt(clearValue);
+
+    return numValue;
+  }
+
   created() {
-    this.value = this.$options.filters.divideByThree(this.suggestion);
-    this.selectedCurrency = this.currencies[0];
-  },
-  methods: {
-    checkValue(event) {
-      const value = event.target.value;
-      const clearValue = value.split(",").join("");
-      const numValue = parseInt(clearValue);
+    this.value = this.divideByThreeFn(this.suggestion);
+    this.dollarValue = this.suggestion;
+    this.selectedCurrency = Object.assign({}, this.currencies[0]);
+  }
 
-      this.dollarValue = Math.round(numValue / this.selectedCurrency.rate);
-      const roundedValue = this.calcPrettyValue(numValue);
-      this.value = this.$options.filters.divideByThree(roundedValue);
-    },
-    setValue(value): void {
-      this.value = this.$options.filters.divideByThree(value);
-    },
-    submitForm() {
-      console.log("submit");
-    },
-    selectCurrency(event) {
-      const id = event.target.value;
-      const newCurrency = this.currencies[id];
-      const newValue = this.dollarValue * newCurrency.rate;
+  /**
+   * Метод, типизирующий фильтр
+   * Фильтр добавляет разделители для суммы
+   */
+  private divideByThreeFn(value: number | string): string {
+    if (!this.$options.filters || !this.$options.filters.divideByThree) {
+      return value.toString();
+    }
 
-      this.selectedCurrency = newCurrency;
+    const fn = this.$options.filters.divideByThree as (
+      value: number | string
+    ) => string;
 
-      if (this.presets.includes(this.dollarValue)) {
-        const roundedValue = this.calcPrettyValue(newValue);
-        this.value = this.$options.filters.divideByThree(roundedValue);
-      } else {
-        this.value = Math.round(newValue);
-      }
-    },
+    return fn(value);
+  }
 
-    calcPresetValue(id) {
-      const value = this.presets[id];
+  /**
+   * Метод, делающий значения суммы красивыми
+   */
+  private calcPrettyValue(value: number): number {
+    const roundedValue = Math.round(value);
+    const length = roundedValue.toString().length;
+    const pow = Math.pow(10, length - 2);
+    const scale = pow < 10 ? 10 : 5 * pow;
+    const delimer = Math.ceil(roundedValue / scale);
+    const newValue = delimer * scale;
 
-      if (!this.selectedCurrency) return value;
+    return newValue;
+  }
 
-      const rate = this.selectedCurrency.rate;
-      const rawValue = value * rate;
+  /**
+   * Обработчик события блюр
+   * Фиксирует значение в валюте по умолчанию, на случай пересчета в другие валюты
+   */
+  public checkValue(): void {
+    if (!this.selectedCurrency) return;
 
-      const calculatedValue = this.calcPrettyValue(rawValue);
+    this.dollarValue = Math.round(this.numValue / this.selectedCurrency.rate);
+  }
 
-      return calculatedValue;
-    },
-    calcPrettyValue(value) {
-      const roundedValue = Math.round(value);
-      const length = roundedValue.toString().length;
-      const pow = Math.pow(10, length - 2);
-      const scale = pow < 10 ? 10 : 5 * pow;
-      const delimer = Math.ceil(roundedValue / scale);
-      const newValue = delimer * scale;
+  /**
+   * Обработчик клика по подсказке
+   * Выставляет значение суммы согласно подсказке
+   */
+  public setValue(value: number): void {
+    if (!this.selectedCurrency) {
+      return;
+    }
 
-      return newValue;
-    },
-    preventNotNumbers(event) {
-      const re = new RegExp(/[0-9]{1}/);
+    const rate = this.selectedCurrency.rate;
+    const rawValue = value * rate;
+    const calculatedValue = this.calcPrettyValue(rawValue);
 
-      if (!re.test(event.key)) event.preventDefault();
-    },
-    prettifyValue(event) {
-      const value = event.target.value;
-      const newValue = this.$options.filters.divideByThree(value);
-      this.value = newValue;
-    },
-  },
-};
+    this.dollarValue = value;
+    this.value = this.divideByThreeFn(calculatedValue);
+  }
+
+  /**
+   * Метод отправки формы
+   */
+  public async submitForm(event: Event): Promise<void> {
+    event.preventDefault();
+
+    if (!this.selectedCurrency) {
+      return;
+    }
+
+    const url = process.env.VUE_APP_API_URL;
+    const endpoint = `${url}/donate`;
+    const res = await axios.post(endpoint, {
+      amount: this.numValue,
+      currency: this.selectedCurrency.code,
+    });
+
+    if (res.status === 200) {
+      this.$toast.open({
+        message: "You have succesfully donated your money",
+        type: "success",
+        position: "top",
+        dismissible: false,
+      });
+    } else {
+      this.$toast.open({
+        message: "Some problem on server-side",
+        type: "error",
+        position: "top",
+        dismissible: false,
+      });
+    }
+  }
+
+  /**
+   * Обработчик дропменю
+   * Меняет валюту на выбранную
+   * Если сумма соответствует одной из подсказок, пересчитывает сумму
+   */
+  public selectCurrency(event: Event): void {
+    const target = event.target as HTMLSelectElement;
+    const id = parseInt(target.value);
+    const newCurrency = Object.assign({}, this.currencies[id]);
+    const newValue = this.dollarValue * newCurrency.rate;
+
+    this.selectedCurrency = newCurrency;
+
+    if (this.presets.includes(this.dollarValue)) {
+      const roundedValue = this.calcPrettyValue(newValue);
+      const dividedValue = this.divideByThreeFn(roundedValue);
+
+      this.value = dividedValue;
+    } else {
+      this.value = this.divideByThreeFn(newValue);
+    }
+  }
+
+  /**
+   * Метод, рассчитывающий значение подсказок, на основе выбранной валюты
+   */
+  public calcPresetValue(id: number): string {
+    const value = this.presets[id];
+
+    if (!this.selectedCurrency) return this.divideByThreeFn(value);
+
+    const rate = this.selectedCurrency.rate;
+    const rawValue = value * rate;
+    const calculatedValue = this.calcPrettyValue(rawValue);
+    const dividedValue = this.divideByThreeFn(calculatedValue);
+
+    return dividedValue;
+  }
+
+  /**
+   * Хендер ввода, блокирующий любые значения кроме цифр
+   */
+  public preventNotNumbers(event: KeyboardEvent): void {
+    const re = new RegExp(/[0-9]{1}/);
+
+    if (!re.test(event.key)) event.preventDefault();
+  }
+
+  /**
+   * Хендер ввода, добавляющий разделители при вводе суммы
+   */
+  public prettifyValue(event: InputEvent): void {
+    const target = event.target as HTMLInputElement;
+    const value = target.value;
+    const newValue = this.divideByThreeFn(value);
+    this.value = newValue;
+  }
+}
 </script>
 <style lang="scss">
 #app {
@@ -172,6 +264,92 @@ export default {
     background-color: #f5f5f7;
     padding: 24px 48px;
     border-radius: 16px;
+
+    .presets {
+      display: grid;
+      grid-template-columns: repeat(3, 100px);
+      grid-gap: 10px;
+
+      &__button {
+        background-image: linear-gradient(to bottom, #fff 0, #f9f9f9 100%);
+        background-repeat: repeat-x;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+        height: 40px;
+        font-size: 18px;
+        line-height: 23px;
+        font-weight: 400;
+        padding: 0 2px;
+        margin: 0;
+        border: 0;
+        border-radius: 5px;
+        width: 100%;
+        outline: none;
+      }
+
+      .--active {
+        background: #2e71d5;
+        color: #fff;
+      }
+    }
+
+    form {
+      padding: 24px 0;
+      width: 100%;
+
+      .input {
+        width: 320px;
+        display: flex;
+        justify-content: space-between;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+        border-radius: 5px;
+        background: #fff;
+        margin-bottom: 20px;
+
+        &__currency {
+          font-size: 21px;
+          line-height: 50px;
+          width: 40px;
+          font-weight: 400;
+          vertical-align: middle;
+          text-align: center;
+        }
+
+        &__field {
+          border: none;
+          background: #fff;
+          line-height: 48px;
+          font-size: 40px;
+          vertical-align: middle;
+          width: 200px;
+          outline: none;
+        }
+
+        &__select {
+          border: none;
+          margin: 0 10px;
+          outline: none;
+        }
+      }
+
+      .submit {
+        background: #4c85db;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+        height: 40px;
+        font-size: 18px;
+        line-height: 23px;
+        font-weight: 400;
+        padding: 0 2px;
+        margin: 0;
+        border: 0;
+        border-radius: 5px;
+        width: 100%;
+
+        &:hover {
+          background: #2e71d5;
+          cursor: pointer;
+        }
+      }
+    }
   }
 }
 </style>
