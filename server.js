@@ -20,7 +20,7 @@ router.post("/donate", koaBody(), async (ctx) => {
   ctx
     .checkBody("currency")
     .isAlpha("Currency must be provided")
-    .len(3, 3, "Incorrect value");
+    .in(['USD', 'EUR', 'GBP', 'RUB'], "Incorrect value");
 
   ctx
     .checkBody("amount")

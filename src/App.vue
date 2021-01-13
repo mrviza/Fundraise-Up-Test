@@ -171,12 +171,7 @@ export default class App extends Vue {
     });
 
     if (res.status === 200) {
-      this.$toast.open({
-        message: "You have succesfully donated your money",
-        type: "success",
-        position: "top",
-        dismissible: false,
-      });
+      window.alert("Thank you for your donation!");
     } else {
       this.$toast.open({
         message: "Some problem on server-side",
