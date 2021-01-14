@@ -47,6 +47,7 @@ import Component from "vue-class-component";
 // eslint-disable-next-line
 import { ToastApi } from "vue-toast-notification/types/toast";
 import axios from "axios";
+import { State, Action } from "vuex-class";
 
 interface Currency {
   name: string;
@@ -76,14 +77,22 @@ export default class App extends Vue {
     { name: "Russian Ruble", code: "RUB", symbol: "₽", rate: 63.461993 },
   ];
   public presets = [40, 100, 200, 1000, 2500, 5000];
-  public value = "";
   public selectedCurrency: null | Currency = null;
-  public dollarValue = 40;
+
+  /**
+   * Vuex state
+   */
+  @State
+  public value!: string;
+  @State
+  public dollarValue!: number;
 
   /**
    * Калькулируемое свойства, возвращающее сумму ввиде числа
    */
-  get numValue() {
+  get numValue(): number {
+    if (!this.value) return 0;
+
     const clearValue = this.value.split(",").join("");
     const numValue = parseInt(clearValue);
 
@@ -91,10 +100,20 @@ export default class App extends Vue {
   }
 
   created() {
-    this.value = this.divideByThreeFn(this.suggestion);
-    this.dollarValue = this.suggestion;
+    const value = this.divideByThreeFn(this.suggestion);
+    
+    this.updateValue(value);
+    this.updateDollarValue(this.suggestion);
     this.selectedCurrency = Object.assign({}, this.currencies[0]);
   }
+
+  /**
+   * Vuex actions
+   */
+  @Action
+  private updateValue!: (value: string) => void;
+  @Action
+  private updateDollarValue!: (dollarValue: number) => void;
 
   /**
    * Метод, типизирующий фильтр
@@ -133,7 +152,9 @@ export default class App extends Vue {
   public checkValue(): void {
     if (!this.selectedCurrency) return;
 
-    this.dollarValue = Math.round(this.numValue / this.selectedCurrency.rate);
+    const newValue = Math.round(this.numValue / this.selectedCurrency.rate);
+
+    this.updateDollarValue(newValue);
   }
 
   /**
@@ -149,8 +170,8 @@ export default class App extends Vue {
     const rawValue = value * rate;
     const calculatedValue = this.calcPrettyValue(rawValue);
 
-    this.dollarValue = value;
-    this.value = this.divideByThreeFn(calculatedValue);
+    this.updateDollarValue(value);
+    this.updateValue(this.divideByThreeFn(calculatedValue));
   }
 
   /**
@@ -199,9 +220,9 @@ export default class App extends Vue {
       const roundedValue = this.calcPrettyValue(newValue);
       const dividedValue = this.divideByThreeFn(roundedValue);
 
-      this.value = dividedValue;
+      this.updateValue(this.divideByThreeFn(dividedValue));
     } else {
-      this.value = this.divideByThreeFn(newValue);
+      this.updateValue(this.divideByThreeFn(newValue));
     }
   }
 
@@ -237,7 +258,8 @@ export default class App extends Vue {
     const target = event.target as HTMLInputElement;
     const value = target.value;
     const newValue = this.divideByThreeFn(value);
-    this.value = newValue;
+
+    this.updateValue(this.divideByThreeFn(newValue));
   }
 }
 </script>
@@ -279,6 +301,7 @@ export default class App extends Vue {
         border-radius: 5px;
         width: 100%;
         outline: none;
+        cursor: pointer;
       }
 
       .--active {
